@@ -87,7 +87,7 @@ blogs : [
 
     {
       name: "ZipMe",
-      link: "https://zipme-bcac7.web.app/"
+      link: "https://sefard01.github.io/zipmee/"
     },
     {
       name: "My NPM Package",
