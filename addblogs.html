@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Blog Post</title>
+    <link rel="stylesheet" href="../index.css" />
+</head>
+
+<body class="blog-management-page add-blog-page">
+
+    <div class="container">
+        <h2 class="header-title">
+            Create New Blog
+            <a href="../fetchBlogs.html" class="action-link">View All Blogs</a>
+        </h2>
+        <form action="">
+            <div class="input-group">
+                <label for="title">Blog Title</label>
+                <input type="text" id="title" name="title">
+            </div>
+            
+            <div class="input-group">
+                <label for="content">Blog Content <span style="font-size:0.8em; font-weight:normal; color:#555;">(Tip: Use Ctrl+B for bold, Ctrl+I for italic, Ctrl+U for underline)</span></label>
+                <textarea id="content" name="content"></textarea>
+            </div>
+            
+            <button type="submit">Publish Blog</button>
+            <div id="statusMessage" style="margin-top: 10px; font-weight: bold;"></div>
+        </form>
+    </div>
+
+    <!--script file  -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-analytics.js";
+        import { getFirestore, collection, addDoc, doc, getDoc, updateDoc } from "https://www.gstatic.com/firebasejs/12.13.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD1u5m750xBcskU-m6fLG7yXqpp72Bsdx4",
+            authDomain: "himanshusingh-1.firebaseapp.com",
+            projectId: "himanshusingh-1",
+            storageBucket: "himanshusingh-1.firebasestorage.app",
+            messagingSenderId: "1022932138361",
+            appId: "1:1022932138361:web:d58e3808afe8aace4bd7a8",
+            measurementId: "G-7K5TRMJ5Z4"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+
+        const form = document.querySelector('form');
+        const submitBtn = document.querySelector('button[type="submit"]');
+        const titleInput = document.getElementById('title');
+        const contentInput = document.getElementById('content');
+        const statusMessage = document.getElementById('statusMessage');
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const blogId = urlParams.get('id');
+
+        if (blogId) {
+            document.querySelector('.header-title').innerHTML = `Edit Blog\n            <a href="fetchBlogs" class="action-link">View All Blogs</a>`;
+            submitBtn.innerText = 'Update Blog';
+            
+            async function fetchBlog() {
+                try {
+                    const docRef = doc(db, "blogs", blogId);
+                    const docSnap = await getDoc(docRef);
+                    if (docSnap.exists()) {
+                        const data = docSnap.data();
+                        titleInput.value = data.title || "";
+                        contentInput.value = data.content || "";
+                    } else {
+                        showMessage('Blog not found!', 'red');
+                    }
+                } catch (e) {
+                    console.error("Error fetching blog:", e);
+                }
+            }
+            fetchBlog();
+        } else {
+            const savedTitle = localStorage.getItem('draftBlogTitle');
+            const savedContent = localStorage.getItem('draftBlogContent');
+            if (savedTitle) titleInput.value = savedTitle;
+            if (savedContent) contentInput.value = savedContent;
+        }
+
+        titleInput.addEventListener('input', () => {
+            if (!blogId) localStorage.setItem('draftBlogTitle', titleInput.value);
+        });
+        
+        contentInput.addEventListener('input', () => {
+            if (!blogId) localStorage.setItem('draftBlogContent', contentInput.value);
+        });
+
+        function showMessage(msg, color) {
+            statusMessage.innerText = msg;
+            statusMessage.style.color = color;
+            setTimeout(() => { statusMessage.innerText = ''; }, 5000);
+        }
+
+        contentInput.addEventListener('keydown', function(e) {
+            if (e.ctrlKey) {
+                let tag = '';
+                if (e.key === 'b' || e.key === 'B') tag = 'b';
+                if (e.key === 'i' || e.key === 'I') tag = 'i';
+                if (e.key === 'u' || e.key === 'U') tag = 'u';
+                
+                if (tag) {
+                    e.preventDefault();
+                    const start = this.selectionStart;
+                    const end = this.selectionEnd;
+                    const text = this.value;
+                    const selectedText = text.substring(start, end);
+                    
+                    const replacement = `<${tag}>${selectedText}</${tag}>`;
+                    
+                    this.value = text.substring(0, start) + replacement + text.substring(end);
+                    
+                    if (start === end) {
+                        this.selectionStart = this.selectionEnd = start + tag.length + 2;
+                    } else {
+                        this.selectionStart = this.selectionEnd = start + replacement.length;
+                    }
+                }
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const title = titleInput.value.trim();
+            const content = contentInput.value.trim();
+
+            if (!title || !content) {
+                showMessage('Please enter both a title and content', 'red');
+                return;
+            }
+            
+            const originalBtnText = submitBtn.innerText;
+            submitBtn.innerText = blogId ? 'Updating...' : 'Publishing...';
+            submitBtn.disabled = true;
+
+            if (blogId) {
+                try {
+                    await updateDoc(doc(db, "blogs", blogId), {
+                        title: title,
+                        content: content
+                    });
+                    showMessage('Blog updated successfully!', 'green');
+                } catch (error) {
+                    console.error("Error updating document: ", error);
+                    showMessage("Error: Data update nahi ho paya. Please check your Firestore Database Rules.", 'red');
+                } finally {
+                    submitBtn.innerText = originalBtnText;
+                    submitBtn.disabled = false;
+                }
+            } else {
+                const newBlog = {
+                    title: title,
+                    content: content,
+                    timestamp: new Date()
+                };
+
+                try {
+                    const docRef = await addDoc(collection(db, "blogs"), newBlog);
+                    console.log("Document written with ID: ", docRef.id);
+                    
+                    form.reset();
+                    localStorage.removeItem('draftBlogTitle');
+                    localStorage.removeItem('draftBlogContent');
+                    showMessage('Blog posted successfully! Check View All Blogs to see it.', 'green');
+
+                } catch (error) {
+                    console.error("Error adding document: ", error);
+                    showMessage("Error: Data save nahi ho paya. Please check your Firestore Database Rules.", 'red');
+                } finally {
+                    submitBtn.innerText = originalBtnText;
+                    submitBtn.disabled = false;
+                }
+            }
+        });
+    </script>
+</body>
+
+</html>
