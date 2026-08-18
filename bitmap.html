@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Developer Workspace - Text Tree</title>
+  <title>Developer Workspace - Sorted Text Tree</title>
   <style>
     * {
       box-sizing: border-box;
@@ -22,7 +22,7 @@
     }
 
     .container {
-      max-width: 800px;
+      max-width: 850px;
       margin: 0 auto;
     }
 
@@ -102,8 +102,16 @@
     });
 
     function renderAsciiTree(usersObj, filterText = '') {
-      const userKeys = Object.keys(usersObj);
+      let userKeys = Object.keys(usersObj);
 
+      // 1. Users ko latest 'lastActive' time ke hisab se sort karein (Newest Top)
+      userKeys.sort((a, b) => {
+        const timeA = new Date(usersObj[a].lastActive || 0).getTime();
+        const timeB = new Date(usersObj[b].lastActive || 0).getTime();
+        return timeB - timeA;
+      });
+
+      // Search filter logic
       const filteredKeys = userKeys.filter(userKey => {
         const user = usersObj[userKey];
         const userName = user.author || userKey;
@@ -130,7 +138,14 @@
         const user = usersObj[userKey];
         const userName = user.author || userKey;
         const projectsObj = user.projects || {};
-        const pNames = Object.keys(projectsObj);
+        let pNames = Object.keys(projectsObj);
+
+        // 2. Projects ko latest 'lastUpdated' time ke hisab se sort karein (Newest Top)
+        pNames.sort((a, b) => {
+          const timeA = new Date(projectsObj[a].lastUpdated || 0).getTime();
+          const timeB = new Date(projectsObj[b].lastUpdated || 0).getTime();
+          return timeB - timeA;
+        });
 
         text += `${uPrefix}${userName}/\n`;
         text += `${uIndent}├── active: ${user.lastActiveLocal || 'N/A'}\n`;
