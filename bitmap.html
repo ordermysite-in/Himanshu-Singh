@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Developer Workspace - Text Tree</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border-radius: 0 !important;
+    }
+
+    body {
+      font-family: "Courier New", Courier, monospace, monospace;
+      background-color: #ffffff;
+      color: #000000;
+      padding: 20px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 8px 10px;
+      background-color: #ffffff;
+      border: 1px solid #000000;
+      color: #000000;
+      font-family: inherit;
+      font-size: 14px;
+      margin-bottom: 20px;
+      outline: none;
+    }
+
+    .search-box:focus {
+      background-color: #f4f4f4;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <input 
+      type="text" 
+      id="search-input" 
+      class="search-box" 
+      placeholder="Type to filter user or project..."
+    />
+
+    <pre id="tree-output">Loading data...</pre>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyD8D3r429IjRHYFsWimO2JN2SifH5MFTr4",
+      authDomain: "bitmapls.firebaseapp.com",
+      databaseURL: "https://bitmapls-default-rtdb.firebaseio.com",
+      projectId: "bitmapls",
+      storageBucket: "bitmapls.firebasestorage.app",
+      messagingSenderId: "41302360308",
+      appId: "1:41302360308:web:d0ecd40bb21fafea629ea1",
+      measurementId: "G-HQFXPL8RN6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const dataRef = ref(database, 'users');
+
+    let allUsersData = {};
+
+    const treeOutput = document.getElementById('tree-output');
+    const searchInput = document.getElementById('search-input');
+
+    onValue(dataRef, (snapshot) => {
+      if (snapshot.exists()) {
+        allUsersData = snapshot.val();
+        renderAsciiTree(allUsersData, searchInput.value.trim().toLowerCase());
+      } else {
+        treeOutput.textContent = "users/\n└── (no data found)";
+      }
+    }, (error) => {
+      treeOutput.textContent = "Error: " + error.message;
+    });
+
+    searchInput.addEventListener('input', (e) => {
+      renderAsciiTree(allUsersData, e.target.value.trim().toLowerCase());
+    });
+
+    function renderAsciiTree(usersObj, filterText = '') {
+      const userKeys = Object.keys(usersObj);
+
+      const filteredKeys = userKeys.filter(userKey => {
+        const user = usersObj[userKey];
+        const userName = user.author || userKey;
+        const projects = user.projects || {};
+        const pNames = Object.keys(projects);
+        
+        if (!filterText) return true;
+        return userName.toLowerCase().includes(filterText) || 
+               pNames.some(p => p.toLowerCase().includes(filterText));
+      });
+
+      if (filteredKeys.length === 0) {
+        treeOutput.textContent = "users/\n└── (no matching results)";
+        return;
+      }
+
+      let text = "users/\n";
+
+      filteredKeys.forEach((userKey, uIndex) => {
+        const isLastUser = uIndex === filteredKeys.length - 1;
+        const uPrefix = isLastUser ? "└── " : "├── ";
+        const uIndent = isLastUser ? "    " : "│   ";
+
+        const user = usersObj[userKey];
+        const userName = user.author || userKey;
+        const projectsObj = user.projects || {};
+        const pNames = Object.keys(projectsObj);
+
+        text += `${uPrefix}${userName}/\n`;
+        text += `${uIndent}├── active: ${user.lastActiveLocal || 'N/A'}\n`;
+        text += `${uIndent}├── os: ${user.os || 'N/A'}\n`;
+        text += `${uIndent}├── vscode: ${user.vscodeVersion || 'N/A'}\n`;
+
+        const matchingProjects = pNames.filter(p => {
+          if (!filterText) return true;
+          return userName.toLowerCase().includes(filterText) || p.toLowerCase().includes(filterText);
+        });
+
+        text += `${uIndent}└── projects/\n`;
+        const projIndent = uIndent + "    ";
+
+        if (matchingProjects.length === 0) {
+          text += `${projIndent}└── (empty)\n`;
+        } else {
+          matchingProjects.forEach((pKey, pIndex) => {
+            const isLastProj = pIndex === matchingProjects.length - 1;
+            const pPrefix = isLastProj ? "└── " : "├── ";
+            const proj = projectsObj[pKey];
+            const lang = proj.language ? ` [${proj.language}]` : '';
+            const updated = proj.lastUpdatedLocal ? ` (${proj.lastUpdatedLocal})` : '';
+
+            text += `${projIndent}${pPrefix}${proj.projectName || pKey}${lang}${updated}\n`;
+          });
+        }
+      });
+
+      treeOutput.textContent = text;
+    }
+  </script>
+</body>
+</html>
